@@ -230,8 +230,8 @@ void saveMqtt(String mqttFn, String mqttHost, String mqttPort, String mqttUser,
   configFile.close();
 }
 
-void saveAdvance(String tempUnit, String supportMode, String loginPassword) {
-  const size_t capacity = JSON_OBJECT_SIZE(3) + 200;
+void saveAdvance(String tempUnit, String supportMode, String supportFanMode, String loginPassword) {
+  const size_t capacity = JSON_OBJECT_SIZE(4) + 200;
   DynamicJsonDocument doc(capacity);
   // if temp unit is empty, we use default celcius
   if (tempUnit == '\0') tempUnit = "cel";
@@ -239,6 +239,9 @@ void saveAdvance(String tempUnit, String supportMode, String loginPassword) {
   // if support mode is empty, we use default all mode
   if (supportMode == '\0') supportMode = "all";
   doc["support_mode"]   = supportMode;
+  // if support fan mode is empty, we use default all mode
+  if (supportFanMode == '\0') supportFanMode = "allf";
+  doc["quiet_mode"]   = supportFanMode;
   // if login password is empty, we use empty
   if (loginPassword == '\0') loginPassword = "";
   doc["login_password"]   = loginPassword;
@@ -387,7 +390,7 @@ bool loadAdvance() {
   std::unique_ptr<char[]> buf(new char[size]);
 
   configFile.readBytes(buf.get(), size);
-  const size_t capacity = JSON_OBJECT_SIZE(3) + 200;
+  const size_t capacity = JSON_OBJECT_SIZE(4) + 200;
   DynamicJsonDocument doc(capacity);
   deserializeJson(doc, buf.get());
   //unit
@@ -396,6 +399,9 @@ bool loadAdvance() {
   //mode
   String supportMode = doc["support_mode"].as<String>();
   if (supportMode == "nht") supportHeatMode = false;
+  //quiet
+  String quietMode = doc["quiet_mode"].as<String>();
+  if (quietMode == "nqm") supportQuietMode = false;
   //prevent login password is "null" if not exist key
   if (doc.containsKey("login_password")) {
     login_password = doc["login_password"].as<String>();
@@ -631,7 +637,7 @@ void handleMqtt() {
 void handleAdvance() {
   checkLogin();
   if (server.hasArg("save")) {
-    saveAdvance(server.arg("tu"), server.arg("md"), server.arg("lpw"));
+    saveAdvance(server.arg("tu"), server.arg("md"), server.arg("mdf"), server.arg("lpw"));
     String headerContent = FPSTR(html_common_header);
     String saveRebootPage =  FPSTR(html_page_save_reboot);
     String footerContent = FPSTR(html_common_footer);
@@ -655,6 +661,10 @@ void handleAdvance() {
     //mode
     if (supportHeatMode) toSend.replace(F("_MD_ALL_"), F("selected"));
     else toSend.replace(F("_MD_NONHEAT_"), F("selected"));
+    //fan quiet mode
+    if (supportQuietMode) toSend.replace(F("_MDF_ALL_"), F("selected"));
+    else toSend.replace(F("_MDF_NONQUIET_"), F("selected"));
+    //login password
     toSend.replace(F("_LOGIN_PASSWORD_"), login_password);
     server.send(200, F("text/html"), toSend);
   }
@@ -1119,7 +1129,7 @@ void hpSettingsChanged() {
   serializeJson(rootInfo, mqttOutput);
 
   if (!mqtt_client.publish(ha_settings_topic.c_str(), mqttOutput.c_str(), true)) {
-    if (_debugMode) mqtt_client.publish(ha_debug_topic.c_str(), (char*)(F("Failed to publish hp settings")));
+    if (_debugMode) mqtt_client.publish(ha_debug_topic.c_str(), (char*)"Failed to publish hp settings");
   }
 
   hpStatusChanged(hp.getStatus());
@@ -1180,7 +1190,7 @@ void hpStatusChanged(heatpumpStatus currentStatus) {
   serializeJson(rootInfo, mqttOutput);
 
   if (!mqtt_client.publish_P(ha_state_topic.c_str(), mqttOutput.c_str(), false)) {
-    if (_debugMode) mqtt_client.publish(ha_debug_topic.c_str(), (char*)(F("Failed to publish hp status change")));
+    if (_debugMode) mqtt_client.publish(ha_debug_topic.c_str(), (char*)"Failed to publish hp status change");
   }
 
 }
@@ -1195,7 +1205,7 @@ void hpPacketDebug(byte* packet, unsigned int length, char* packetDirection) {
       message += String(packet[idx], HEX) + " ";
     }
 
-    const size_t bufferSize = JSON_OBJECT_SIZE(1);
+    const size_t bufferSize = JSON_OBJECT_SIZE(10);
     StaticJsonDocument<bufferSize> root;
 
     root[packetDirection] = message;
@@ -1227,7 +1237,7 @@ void hpSendDummy(String name, String value, String name2, String value2) {
   String mqttOutput;
   serializeJson(rootInfo, mqttOutput);
   if (!mqtt_client.publish_P(ha_state_topic.c_str(), mqttOutput.c_str(), false)) {
-    if (_debugMode) mqtt_client.publish(ha_debug_topic.c_str(), (char*)(F("Failed to publish dummy hp status change")));
+    if (_debugMode) mqtt_client.publish(ha_debug_topic.c_str(), (char*)"Failed to publish dummy hp status change");
   }
   // Restart counter for waiting enought time for the unit to update before sending a state packet
   lastTempSend = millis();
@@ -1262,20 +1272,21 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       modeUpper = "AUTO";
       hpSendDummy("mode", "heat_cool", "action", "idle");
     }
-    if (modeUpper == "HEAT") {
+    else if (modeUpper == "HEAT") {
       hpSendDummy("mode", "heat", "action", "heating");
     }
-    if (modeUpper == "COOL") {
+    else if (modeUpper == "COOL") {
       hpSendDummy("mode", "cool", "action", "cooling");
     }
-    if (modeUpper == "DRY") {
+    else if (modeUpper == "DRY") {
       hpSendDummy("mode", "dry", "action", "drying");
 
     }
-    if (modeUpper == "FAN_ONLY") {
+    else if (modeUpper == "FAN_ONLY") {
       modeUpper = "FAN";
       hpSendDummy("action", "fan_only", "mode", "fan_only");
-    }
+    }  
+    
     if (modeUpper == "OFF") {
       hp.setPowerSetting("OFF");
       hpSendDummy("action", "off", "mode", "off");
@@ -1287,7 +1298,16 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     hp.update();
   }
   else if (strcmp(topic, ha_temp_set_topic.c_str()) == 0) {
+    //add to fix HP turn off after change temperature
+    heatpumpSettings currentSettings = hp.getSettings();
+    delay(10);
+    hp.setPowerSetting(currentSettings.power);
+    hp.setModeSetting(currentSettings.mode);
+    //
     float temperature = strtof(message, NULL);
+    if(!(temperature>=min_temp&&temperature<=max_temp)){
+       temperature = 23;
+    }
     const size_t bufferSize = JSON_OBJECT_SIZE(2);
     StaticJsonDocument<bufferSize> root;
     root["temperature"] = message;
@@ -1319,10 +1339,10 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   else if (strcmp(topic, ha_debug_set_topic.c_str()) == 0) { //if the incoming message is on the heatpump_debug_set_topic topic...
     if (strcmp(message, "on") == 0) {
       _debugMode = true;
-      mqtt_client.publish(ha_debug_topic.c_str(), (char*)(F("Debug mode enabled")));
+      mqtt_client.publish(ha_debug_topic.c_str(), (char*)"Debug mode enabled");
     } else if (strcmp(message, "off") == 0) {
       _debugMode = false;
-      mqtt_client.publish(ha_debug_topic.c_str(), (char*)(F("Debug mode disabled")));
+      mqtt_client.publish(ha_debug_topic.c_str(), (char*)"Debug mode disabled");
     }
   } else {
     mqtt_client.publish(ha_debug_topic.c_str(), strcat((char *)"heatpump: wrong mqtt topic: ", topic));
@@ -1369,7 +1389,9 @@ void haConfig() {
 
   JsonArray haConfigFan_modes = haConfig.createNestedArray("fan_modes");
   haConfigFan_modes.add("AUTO");
-  haConfigFan_modes.add("QUIET");
+  if (supportQuietMode) {
+    haConfigFan_modes.add("QUIET");
+  }
   haConfigFan_modes.add("1");
   haConfigFan_modes.add("2");
   haConfigFan_modes.add("3");

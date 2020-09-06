@@ -389,6 +389,13 @@ const char html_page_advance[] PROGMEM = R"====(
                             <option value="nht" _MD_NONHEAT_>Not support heat mode</option>
                         </select>
                     </p>
+                    <p>
+                        <b>Fan mode Support</b>
+                        <select name="mdf">
+                            <option value="allf" _MDF_ALL_>All mode</option>
+                            <option value="nqm" _MDF_NONQUIET_>Not support quiet mode</option>
+                        </select>
+                    </p>
                     <p><b>Login Password</b>
                         <br/>
                         <input id='lpw' name='lpw' type='password' placeholder=' ' value='_LOGIN_PASSWORD_'>

@@ -14,7 +14,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-const PROGMEM char* m2mqtt_version = "0.6.0";
+const PROGMEM char* m2mqtt_version = "0.6.2";
 
 //Define global variables for files
 #ifdef ESP32
@@ -93,3 +93,5 @@ const PROGMEM uint32_t MQTT_RETRY_INTERVAL_MS = 1000; //1 seconds
 bool useFahrenheit = false;
 // support heat mode settings, some model do not support heat mode 
 bool supportHeatMode = true;
+// support quiet mode for fan settings, some model do not support quite mode: MSZ-GE35VA, MSZ-GE71VA, MSZ-GE25VA https://github.com/SwiCago/HeatPump/issues/162
+bool supportQuietMode = true;
