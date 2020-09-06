@@ -585,7 +585,7 @@ void handleOthers() {
     String othersPage =  FPSTR(html_page_others);
     String footerContent = FPSTR(html_common_footer);
     String toSend = headerContent + othersPage + footerContent;
-    toSend.replace("_UNIT_NAME_", mqtt_fn);
+    toSend.replace("_UNIT_NAME_", hostname);
     toSend.replace("_VERSION_", m2mqtt_version);
     toSend.replace("_HAA_TOPIC_", others_haa_topic);
     if (strcmp(others_haa.c_str(), "ON") == 0) {
@@ -653,7 +653,7 @@ void handleAdvance() {
     String advancePage =  FPSTR(html_page_advance);
     String footerContent = FPSTR(html_common_footer);
     String toSend = headerContent + advancePage + footerContent;
-    toSend.replace(F("_UNIT_NAME_"), mqtt_fn);
+    toSend.replace(F("_UNIT_NAME_"), hostname);
     toSend.replace(F("_VERSION_"), m2mqtt_version);
     //temp
     if (useFahrenheit) toSend.replace(F("_TU_FAH_"), F("selected"));
@@ -1151,7 +1151,7 @@ String hpGetMode() {
   return result;
 }
 
-String hpGetAction() {
+String hpGetAction(bool operating) {
   heatpumpSettings currentSettings = hp.getSettings();
   String hppower = String(currentSettings.power);
   String hpmode = String(currentSettings.mode);
@@ -1163,10 +1163,11 @@ String hpGetAction() {
     if (hpmode == "auto") result = "auto";
     //        if (currentStatus.roomTemperature > currentSettings.temperature) result = "cooling"
     //        else result = "heating";
-    else if (hpmode == "cool") result = "cooling";
-    else if (hpmode == "heat") result = "heating";
-    else if (hpmode == "dry")  result = "drying";
+    else if (hpmode == "cool" and operating) result = "cooling";
+    else if (hpmode == "heat" and operating) result = "heating";
+    else if (hpmode == "dry" and operating)  result = "drying";
     else if (hpmode == "fan")  result = "idle";
+    else result = "idle";
   }
   return result;
 }
@@ -1176,15 +1177,15 @@ void hpStatusChanged(heatpumpStatus currentStatus) {
   // send room temp, operating info and all information
   heatpumpSettings currentSettings = hp.getSettings();
 
-  const size_t bufferSizeInfo = JSON_OBJECT_SIZE(7);
+  const size_t bufferSizeInfo = JSON_OBJECT_SIZE(8);
   StaticJsonDocument<bufferSizeInfo> rootInfo;
 
   rootInfo["roomTemperature"] = getTemperature(currentStatus.roomTemperature, useFahrenheit);
   rootInfo["temperature"]     = getTemperature(currentSettings.temperature, useFahrenheit);
-  //rootInfo["operating"]       = currentStatus.operating;
+  rootInfo["operating"]       = currentStatus.operating;
   rootInfo["fan"]             = currentSettings.fan;
   rootInfo["vane"]            = currentSettings.vane;
-  rootInfo["action"]          = hpGetAction();
+  rootInfo["action"]          = hpGetAction(currentStatus.operating);
   rootInfo["mode"]            = hpGetMode();
   String mqttOutput;
   serializeJson(rootInfo, mqttOutput);
@@ -1229,7 +1230,7 @@ void hpSendDummy(String name, String value, String name2, String value2) {
   rootInfo["temperature"]     = getTemperature(currentSettings.temperature, useFahrenheit);
   rootInfo["fan"]             = currentSettings.fan;
   rootInfo["vane"]            = currentSettings.vane;
-  rootInfo["action"]          = hpGetAction();
+  rootInfo["action"]          = hpGetAction(currentStatus.operating);
   rootInfo["mode"]            = hpGetMode();
   rootInfo[name] = value;
   if (name2 != "") rootInfo[name2] = value2;

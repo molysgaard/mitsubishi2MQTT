@@ -14,7 +14,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-const PROGMEM char* m2mqtt_version = "0.6.2";
+const PROGMEM char* m2mqtt_version = "0.6.2.1";
 
 //Define global variables for files
 #ifdef ESP32
