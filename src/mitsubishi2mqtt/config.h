@@ -14,7 +14,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-const PROGMEM char* m2mqtt_version = "0.6.2.1";
+const PROGMEM char* m2mqtt_version = "0.6.2.2";
 
 //Define global variables for files
 #ifdef ESP32
@@ -72,6 +72,7 @@ String ha_debug_set_topic;
 String ha_config_topic;
 String ha_discovery_topic;
 String hvac_name;
+String ha_availability_topic;
 //login
 String login_username = "admin";
 String login_password;

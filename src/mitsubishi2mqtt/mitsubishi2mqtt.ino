@@ -142,6 +142,7 @@ void setup() {
       ha_debug_topic        = mqtt_topic + "/" + mqtt_fn + "/debug";
       ha_debug_set_topic    = mqtt_topic + "/" + mqtt_fn + "/debug/set";
       ha_config_topic       = "homeassistant/climate/" + mqtt_fn + "/config";
+      ha_availability_topic = mqtt_topic + "/" + mqtt_fn + "/availability";
       // startup mqtt connection
       initMqtt();
     }
@@ -1193,6 +1194,10 @@ void hpStatusChanged(heatpumpStatus currentStatus) {
   if (!mqtt_client.publish_P(ha_state_topic.c_str(), mqttOutput.c_str(), false)) {
     if (_debugMode) mqtt_client.publish(ha_debug_topic.c_str(), (char*)"Failed to publish hp status change");
   }
+  //send keep alive message
+  if (!mqtt_client.publish(ha_availability_topic.c_str(), "online", true)) {
+    if (_debugMode) mqtt_client.publish(ha_debug_topic.c_str(), (char*)"Failed to publish avialable status");
+  }
 
 }
 
@@ -1354,7 +1359,7 @@ void haConfig() {
 
   // send HA config packet
   // setup HA payload device
-  const size_t capacity = JSON_ARRAY_SIZE(5) + 2 * JSON_ARRAY_SIZE(6) + JSON_ARRAY_SIZE(7) + JSON_OBJECT_SIZE(24) + 2048;
+  const size_t capacity = JSON_ARRAY_SIZE(6) + 2 * JSON_ARRAY_SIZE(6) + JSON_ARRAY_SIZE(7) + JSON_OBJECT_SIZE(24) + 2048;
   DynamicJsonDocument haConfig(capacity);
 
   haConfig["name"]                          = mqtt_fn;
@@ -1377,7 +1382,7 @@ void haConfig() {
   haConfig["temp_cmd_t"]                    = ha_temp_set_topic;
   haConfig["temp_stat_t"]                   = ha_state_topic;
   String temp_stat_tpl_str                  = F("{{ value_json.temperature if (value_json is defined and value_json.temperature is defined and value_json.temperature|int > ");
-  temp_stat_tpl_str                        += (String)getTemperature(16, useFahrenheit) + ") else '" + (String)getTemperature(26, useFahrenheit) + "' }}"; //Set default value for fix "Could not parse data for HA"
+  temp_stat_tpl_str                        += (String)getTemperature(min_temp, useFahrenheit) + ") else '" + (String)getTemperature(26, useFahrenheit) + "' }}"; //Set default value for fix "Could not parse data for HA"
   haConfig["temp_stat_tpl"]                 = temp_stat_tpl_str;
   haConfig["curr_temp_t"]                   = ha_state_topic;
   String curr_temp_tpl_str                  = F("{{ value_json.roomTemperature if (value_json is defined and value_json.roomTemperature is defined and value_json.roomTemperature|int > ");
@@ -1387,7 +1392,8 @@ void haConfig() {
   haConfig["max_temp"]                      = getTemperature(max_temp, useFahrenheit);
   haConfig["temp_step"]                     = temp_step;
   haConfig["pow_cmd_t"]                     = ha_power_set_topic;
-
+  haConfig["avty_t"]                        = ha_availability_topic;
+  
   JsonArray haConfigFan_modes = haConfig.createNestedArray("fan_modes");
   haConfigFan_modes.add("AUTO");
   if (supportQuietMode) {
@@ -1437,7 +1443,7 @@ void mqttConnect() {
   int attempts = 0;
   while (!mqtt_client.connected()) {
     // Attempt to connect
-    mqtt_client.connect(mqtt_client_id.c_str(), mqtt_username.c_str(), mqtt_password.c_str());
+    mqtt_client.connect(mqtt_client_id.c_str(), mqtt_username.c_str(), mqtt_password.c_str(), ha_availability_topic.c_str(), 1, true, "offline");
     // If state < 0 (MQTT_CONNECTED) => network problem we retry 5 times and then waiting for MQTT_RETRY_INTERVAL_MS and retry reapeatly
     if (mqtt_client.state() < MQTT_CONNECTED) {
       if (attempts == 5) {
@@ -1461,6 +1467,8 @@ void mqttConnect() {
       mqtt_client.subscribe(ha_fan_set_topic.c_str());
       mqtt_client.subscribe(ha_temp_set_topic.c_str());
       mqtt_client.subscribe(ha_vane_set_topic.c_str());
+      //send online message
+      mqtt_client.publish(ha_availability_topic.c_str(), "online", true);
       haConfig();
     }
   }
