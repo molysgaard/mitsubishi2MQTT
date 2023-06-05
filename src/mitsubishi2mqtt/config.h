@@ -14,7 +14,7 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-const PROGMEM char* m2mqtt_version = "0.6.2.2";
+const PROGMEM char* m2mqtt_version = "0.6.3";
 
 //Define global variables for files
 #ifdef ESP32
@@ -38,6 +38,9 @@ const PROGMEM  uint8_t redLedPin = 0;
 
 // Define global variables for network
 const PROGMEM char* hostnamePrefix = "HVAC_";
+const PROGMEM uint32_t WIFI_RETRY_INTERVAL_MS = 300000; //300 seconds
+unsigned long wifi_timeout;
+bool wifi_config_exists;
 String hostname = "";
 String ap_ssid;
 String ap_pwd;

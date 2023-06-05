@@ -97,7 +97,7 @@ void setup() {
   WiFi.hostname(hostname.c_str());
 #endif
   setDefaults();
-  loadWifi();
+  wifi_config_exists = loadWifi();
   loadAdvance();
   if (initWifi()) {
     if (SPIFFS.exists(console_file)) {
@@ -438,6 +438,7 @@ boolean initWifi() {
 
   Serial.println(F("\n\r \n\rStarting in AP mode"));
   WiFi.mode(WIFI_AP);
+  wifi_timeout = millis() + WIFI_RETRY_INTERVAL_MS;
   WiFi.persistent(false); //fix crash esp32 https://github.com/espressif/arduino-esp32/issues/2025
   if (!connectWifiSuccess) {
     // Set AP password when falling back to AP on fail
@@ -1291,8 +1292,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     else if (modeUpper == "FAN_ONLY") {
       modeUpper = "FAN";
       hpSendDummy("action", "fan_only", "mode", "fan_only");
-    }  
-    
+    }
+
     if (modeUpper == "OFF") {
       hp.setPowerSetting("OFF");
       hpSendDummy("action", "off", "mode", "off");
@@ -1311,8 +1312,8 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     hp.setModeSetting(currentSettings.mode);
     //
     float temperature = strtof(message, NULL);
-    if(!(temperature>=min_temp&&temperature<=max_temp)){
-       temperature = 23;
+    if (!(temperature >= min_temp && temperature <= max_temp)) {
+      temperature = 23;
     }
     const size_t bufferSize = JSON_OBJECT_SIZE(2);
     StaticJsonDocument<bufferSize> root;
@@ -1393,7 +1394,7 @@ void haConfig() {
   haConfig["temp_step"]                     = temp_step;
   haConfig["pow_cmd_t"]                     = ha_power_set_topic;
   haConfig["avty_t"]                        = ha_availability_topic;
-  
+
   JsonArray haConfigFan_modes = haConfig.createNestedArray("fan_modes");
   haConfigFan_modes.add("AUTO");
   if (supportQuietMode) {
@@ -1489,8 +1490,8 @@ bool connectWifi() {
 #endif
   WiFi.begin(ap_ssid.c_str(), ap_pwd.c_str());
   Serial.println("Connecting to " + ap_ssid);
-  unsigned long wifiStartTime = millis();
-  while (WiFi.status() != WL_CONNECTED && millis() - wifiStartTime < 10000) {
+  wifi_timeout = millis() + 30000;
+  while (WiFi.status() != WL_CONNECTED && millis() < wifi_timeout) {
     Serial.write('.');
     //Serial.print(WiFi.status());
     // wait 500ms, flashing the blue LED to indicate WiFi connecting...
@@ -1601,6 +1602,13 @@ void checkLogin() {
 void loop() {
   server.handleClient();
   ArduinoOTA.handle();
+  
+  //reset board to attempt to connect to wifi again if in ap mode or wifi dropped out and time limit passed
+  if (WiFi.getMode() == WIFI_STA and WiFi.status() == WL_CONNECTED) {
+    wifi_timeout = millis() + WIFI_RETRY_INTERVAL_MS;
+  } else if (wifi_config_exists and millis() > wifi_timeout) {
+    ESP.restart();
+  }
   if (!captive and mqtt_config) {
     // Sync HVAC UNIT
     hp.sync();
