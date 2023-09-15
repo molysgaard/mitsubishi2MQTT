@@ -235,16 +235,16 @@ void saveAdvance(String tempUnit, String supportMode, String supportFanMode, Str
   const size_t capacity = JSON_OBJECT_SIZE(4) + 200;
   DynamicJsonDocument doc(capacity);
   // if temp unit is empty, we use default celcius
-  if (tempUnit == '\0') tempUnit = "cel";
+  if (tempUnit.isEmpty()) tempUnit = "cel";
   doc["unit_tempUnit"]   = tempUnit;
   // if support mode is empty, we use default all mode
-  if (supportMode == '\0') supportMode = "all";
+  if (supportMode.isEmpty()) supportMode = "all";
   doc["support_mode"]   = supportMode;
   // if support fan mode is empty, we use default all mode
-  if (supportFanMode == '\0') supportFanMode = "allf";
+  if (supportFanMode.isEmpty()) supportFanMode = "allf";
   doc["quiet_mode"]   = supportFanMode;
   // if login password is empty, we use empty
-  if (loginPassword == '\0') loginPassword = "";
+  if (loginPassword.isEmpty()) loginPassword = "";
   doc["login_password"]   = loginPassword;
   File configFile = SPIFFS.open(advance_conf, "w");
   if (!configFile) {
@@ -1363,7 +1363,7 @@ void haConfig() {
   const size_t capacity = JSON_ARRAY_SIZE(6) + 2 * JSON_ARRAY_SIZE(6) + JSON_ARRAY_SIZE(7) + JSON_OBJECT_SIZE(24) + 2048;
   DynamicJsonDocument haConfig(capacity);
 
-  haConfig["name"]                          = mqtt_fn;
+  haConfig["name"]                          = nullptr;
   haConfig["unique_id"]                     = getId();
 
   JsonArray haConfigModes = haConfig.createNestedArray("modes");
@@ -1559,9 +1559,9 @@ String getTemperatureScale() {
 
 String getId() {
 #ifdef ESP32
-  uint64_t macAddress = ESP.getEfuseMac();
-  uint64_t macAddressTrunc = macAddress << 40;
-  uint32_t chipID = macAddressTrunc >> 40;
+  char chipID[23];
+  snprintf(chipID, 23, "%llX", ESP.getEfuseMac());
+  return String(chipID);
 #else
   uint32_t chipID = ESP.getChipId();
 #endif
@@ -1615,7 +1615,7 @@ void loop() {
     //MQTT failed retry to connect
     if (mqtt_client.state() < MQTT_CONNECTED)
     {
-      if ((millis() > (lastMqttRetry + MQTT_RETRY_INTERVAL_MS)) or lastMqttRetry == 0) {
+      if ((millis() - lastMqttRetry > MQTT_RETRY_INTERVAL_MS) or lastMqttRetry == 0) {
         mqttConnect();
       }
     }
