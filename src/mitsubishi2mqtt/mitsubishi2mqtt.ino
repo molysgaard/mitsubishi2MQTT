@@ -154,7 +154,12 @@ void setup() {
     hp.setSettingsChangedCallback(hpSettingsChanged);
     hp.setStatusChangedCallback(hpStatusChanged);
     hp.setPacketCallback(hpPacketDebug);
+    if (server.hasArg("CONNECT")) {
+#if defined(ESP32) && defined(HP_TX) && defined(HP_RX)
+    hp.connect(&Serial2, HP_RX, HP_TX);
+#else
     hp.connect(&Serial);
+#endif
     lastTempSend = millis();
   }
   else {
@@ -1060,7 +1065,11 @@ void write_log(String log) {
 
 heatpumpSettings change_states(heatpumpSettings settings) {
   if (server.hasArg("CONNECT")) {
+#if defined(ESP32) && defined(HP_TX) && defined(HP_RX)
+    hp.connect(&Serial2, HP_RX, HP_TX);
+#else
     hp.connect(&Serial);
+#endif
   }
   else {
     bool update = false;

@@ -17,6 +17,9 @@
 const PROGMEM char* m2mqtt_version = "0.6.4";
 
 //Define global variables for files
+#define HP_TX 26 //define the ESP32 custom TX pin
+#define HP_RX 27 //define the ESP32 custom RX pin
+
 #ifdef ESP32
 const PROGMEM char* wifi_conf = "/wifi.json";
 const PROGMEM char* mqtt_conf = "/mqtt.json";
