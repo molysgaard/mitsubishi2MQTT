@@ -154,7 +154,6 @@ void setup() {
     hp.setSettingsChangedCallback(hpSettingsChanged);
     hp.setStatusChangedCallback(hpStatusChanged);
     hp.setPacketCallback(hpPacketDebug);
-    if (server.hasArg("CONNECT")) {
 #if defined(ESP32) && defined(HP_TX) && defined(HP_RX)
     hp.connect(&Serial2, HP_RX, HP_TX);
 #else
