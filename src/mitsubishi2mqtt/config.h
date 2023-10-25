@@ -17,8 +17,9 @@
 const PROGMEM char* m2mqtt_version = "0.6.4";
 
 //Define global variables for files
-#define HP_TX 26 //define the ESP32 custom TX pin
-#define HP_RX 27 //define the ESP32 custom RX pin
+// MOL: Disable this as we want to use the default serial port
+//#define HP_TX 26 //define the ESP32 custom TX pin
+//#define HP_RX 27 //define the ESP32 custom RX pin
 
 #ifdef ESP32
 const PROGMEM char* wifi_conf = "/wifi.json";
@@ -81,7 +82,7 @@ String hvac_name;
 String ha_availability_topic;
 //login
 String login_username = "admin";
-String login_password;
+String login_password = "admin";
 
 // debug mode, when true, will send all packets received from the heatpump to topic heatpump_debug_topic
 // this can also be set by sending "on" to heatpump_debug_set_topic
